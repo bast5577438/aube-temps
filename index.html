@@ -417,11 +417,12 @@ function startApp(){
   }
 
   function boot(){
+    let subscribed = false;
     supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         state.uid = session.user.id;
         appEl.classList.add('show');
-        subscribeData();
+        if (!subscribed) { subscribed = true; subscribeData(); }
       }
     });
     supabase.auth.getSession().then(({ data }) => {
