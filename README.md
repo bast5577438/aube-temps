@@ -1,25 +1,44 @@
-# Aube Digital — Temps
+<div align="center">
+  <img src="assets/logo.png" alt="Aube Digital" width="96">
 
-Gestionnaire de temps perso (tâches + planning hebdo) pour Aube Digital. Un seul fichier `index.html`, vanilla JS, Firebase (Firestore) pour la synchro entre tes appareils, déployable directement sur Vercel.
+  # Aube Digital — Temps
 
-## 1. Créer le projet Firebase (5 min)
+  **Gestionnaire de temps personnel pour freelances.**
+  *L'IA est un outil, pas une menace.*
+</div>
 
-1. Va sur [console.firebase.google.com](https://console.firebase.google.com) → **Ajouter un projet** → nomme-le par ex. `aube-digital-temps` → crée-le (tu peux désactiver Google Analytics, pas utile ici).
-2. Dans le projet, clique l'icône **</>** (Web) pour ajouter une appli web → nomme-la `aube-temps` → **Enregistrer l'application**.
-3. Firebase t'affiche un objet `firebaseConfig`. Copie-le.
-4. Ouvre `index.html`, repère vers le haut du `<script type="module">` :
-   ```js
-   const firebaseConfig = {
-     apiKey: "YOUR_API_KEY",
-     ...
-   };
-   ```
-   et remplace-le par celui que Firebase t'a donné.
+---
 
-## 2. Activer Firestore
+## À propos
 
-1. Dans la console Firebase, menu de gauche → **Firestore Database** → **Créer une base de données** → mode **production** → choisis une région proche (ex. `eur3`).
-2. Onglet **Règles**, remplace par :
+**Aube Digital — Temps** est un outil léger de gestion de temps conçu pour un développeur web freelance jonglant entre prospection, missions clients, formation et création de contenu. Pas de compte à gérer, pas de framework lourd : un seul fichier HTML, du JavaScript vanilla, et Firebase pour la synchronisation entre appareils.
+
+Construit et maintenu par [Aube Digital](https://github.com/bast5577438).
+
+## Fonctionnalités
+
+- **Tâches & planning hebdomadaire** — on pose la semaine à l'avance, on confirme chaque jour la veille.
+- **Catégories personnalisables** — Prospection, Client, Formation, Aube Digital, Perso (modifiables dans le code).
+- **Durée estimée par tâche** — pas de chrono temps réel, juste de l'estimé à cocher une fois fait.
+- **Dashboard du jour** — tâches en retard, rappel de confirmation du lendemain, objectifs hebdo par catégorie (heures faites vs objectif).
+- **Synchronisation multi-appareils** via Firebase Firestore, sans création de compte classique.
+- **Responsive** mobile et desktop, identité visuelle Aube Digital (dégradé aurore, Space Grotesk + Inter).
+
+## Stack technique
+
+- HTML / CSS / JavaScript vanilla — aucun framework, aucune étape de build.
+- [Firebase](https://firebase.google.com/) (Firestore + Authentication anonyme) pour la persistance et la synchro.
+- Déploiement statique sur [Vercel](https://vercel.com/).
+
+## Installation
+
+### 1. Configurer Firebase
+
+1. Crée un projet sur la [console Firebase](https://console.firebase.google.com).
+2. Ajoute une application **Web** (`</>`) et récupère l'objet `firebaseConfig`.
+3. Colle-le dans `index.html`, en haut du `<script type="module">`, à la place du `firebaseConfig` existant.
+4. Active **Firestore Database** (mode production) et publie ces règles :
+
    ```
    rules_version = '2';
    service cloud.firestore {
@@ -30,39 +49,41 @@ Gestionnaire de temps perso (tâches + planning hebdo) pour Aube Digital. Un seu
      }
    }
    ```
-   → **Publier**.
 
-## 3. Activer l'authentification anonyme
+5. Active l'authentification **Anonyme** dans **Authentication → Sign-in method**.
 
-1. Menu de gauche → **Authentication** → **Get started**.
-2. Onglet **Sign-in method** → active le fournisseur **Anonyme**.
+### 2. Lancer en local
 
-C'est tout pour Firebase. L'app se connecte silencieusement en anonyme (pas d'écran de login) — la séparation de tes données se fait via le **code d'accès perso** que tu choisis au premier lancement (à retaper sur ton autre appareil pour retrouver les mêmes données). Ce n'est pas un vrai compte sécurisé : ne mets pas ce lien public, et garde ton code pour toi.
-
-## 4. Tester en local
-
-Ouvre simplement `index.html` dans ton navigateur (double-clic), ou avec un petit serveur local :
-```
+```bash
 npx serve .
 ```
 
-## 5. Déployer sur Vercel
+ou ouvre simplement `index.html` dans un navigateur.
 
-```
-npx vercel
-```
-(ou connecte le dossier à un repo Git et importe-le sur vercel.com — c'est un site 100% statique, aucune config Vercel nécessaire).
+### 3. Déployer sur Vercel
 
-## Comment ça marche
+Importe ce repo depuis le [dashboard Vercel](https://vercel.com/new) — c'est un site 100% statique, aucune configuration supplémentaire n'est nécessaire.
 
-- **Catégories** : Prospection, Client, Formation, Aube Digital, Perso — codées en dur dans `CATEGORIES` en haut du script si tu veux les changer.
-- **Tâches/créneaux** : titre, catégorie, date, heure (optionnelle), durée estimée. Pas de chrono temps réel — juste de l'estimé que tu coches une fois fait.
-- **Semaine** : tu poses tes créneaux à l'avance sur la vue "Semaine". Chaque jour a un badge *Vide / À confirmer / Confirmé*. Le bouton "Confirmer" sur un jour marque tous ses créneaux comme validés.
-- **Dashboard "Aujourd'hui"** : bannière des tâches en retard (non faites, date passée), bannière "demain à confirmer" si le planning du lendemain n'est pas encore validé, barres d'objectifs hebdo (heures faites vs objectif, réglables via l'icône ⚙), et le planning du jour à cocher.
-- **Objectifs hebdo** : réglables dans ⚙ Réglages, en heures par catégorie.
-- **Raccourci clavier** : `n` ouvre l'ajout rapide, `Échap` ferme les modales.
+## Fonctionnement
+
+L'app n'a pas de système de compte classique. Au premier lancement, on choisit un **code d'accès personnel** : il sert de clé de partitionnement des données dans Firestore (`spaces/{code}/...`) et doit être saisi à l'identique sur chaque appareil pour retrouver ses données.
+
+## ⚠️ Sécurité
+
+Ce projet étant public, le code source — y compris les règles Firestore — est lisible par tout le monde. La protection des données ne repose **pas** sur un compte/mot de passe classique, mais sur :
+
+- l'authentification anonyme Firebase (bloque les appels directs sans session), et
+- le **code d'accès personnel**, qui doit rester confidentiel et suffisamment difficile à deviner (éviter un simple prénom + année).
+
+Ce n'est pas un niveau de sécurité "entreprise" — adapté à un usage personnel, pas à des données sensibles ou réglementées.
 
 ## Limites connues (MVP)
 
-- Toute la collection `blocks` est chargée d'un coup (pas de pagination/filtrage par date côté serveur) — largement suffisant pour un usage perso, à revoir si l'historique devient très volumineux.
-- Pas de vrai compte/mot de passe : la protection repose sur le code d'accès + l'auth anonyme Firebase.
+- Toute la collection `blocks` est chargée en une fois (pas de filtrage par date côté serveur) — largement suffisant pour un usage perso.
+- Pas de compte multi-utilisateurs : un seul code d'accès par "espace" de données.
+
+---
+
+<div align="center">
+  <sub>© Aube Digital — Bastien Vannière</sub>
+</div>
