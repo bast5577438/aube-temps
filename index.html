@@ -219,13 +219,13 @@
     </div>
   </div>
 
-  <!-- ===== FIREBASE SETUP NOTICE ===== -->
+  <!-- ===== SUPABASE SETUP NOTICE ===== -->
   <div id="setupNotice" class="setup-notice center-screen">
     <div class="gate-card">
       <div class="logo-mark">AD</div>
-      <h1>Configuration Firebase requise</h1>
-      <p>Le fichier <code>index.html</code> n'a pas encore sa config Firebase. Ouvre le fichier, repère <code>const firebaseConfig</code> en haut du script, et colle les clés de ton projet Firebase (Project settings → Vos applications → SDK config).</p>
-      <p>Pense aussi à activer <strong>Firestore</strong> et l'authentification <strong>Anonyme</strong> dans la console Firebase. Voir le README du dossier pour les étapes complètes.</p>
+      <h1>Configuration Supabase requise</h1>
+      <p>Le fichier <code>index.html</code> n'a pas encore sa config Supabase. Ouvre le fichier, repère <code>const supabaseConfig</code> en haut du script, et colle l'URL + la clé <strong>anon</strong> (jamais service_role) de ton projet Supabase.</p>
+      <p>Pense aussi à avoir créé les tables <strong>blocks</strong>/<strong>goals</strong> (RLS activé) et activé les <strong>connexions anonymes</strong> dans Authentication → Providers. Voir le README du dossier pour les étapes complètes.</p>
     </div>
   </div>
 
@@ -340,24 +340,16 @@
   </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, setDoc, writeBatch
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ============================================================
-// TODO: colle ici la config de TON projet Firebase
-// (Console Firebase → Paramètres du projet → Vos applications → SDK config)
+// Config du projet Supabase "aube-temps-db"
+// (Vercel → Storage → aube-temps-db, ou dashboard Supabase → Settings → API)
+// Uniquement l'URL et la clé "anon" (publique) — jamais service_role.
 // ============================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyDMR8XU6wFa75CBpnF2drwSx5K0tQKtIrg",
-  authDomain: "getsionnaire-de-temps.firebaseapp.com",
-  projectId: "getsionnaire-de-temps",
-  storageBucket: "getsionnaire-de-temps.firebasestorage.app",
-  messagingSenderId: "1096399307211",
-  appId: "1:1096399307211:web:1822f18df950098446364e"
+const supabaseConfig = {
+  url: "https://dbisgazwiryayoxjbflz.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiaXNnYXp3aXJ5YXlveGpiZmx6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMTU1NDUsImV4cCI6MjA5NzY5MTU0NX0.TWxQDru5XvZc3Tz-mRxu6lIiJJhSaYKdbAk7KsQV69o"
 };
 
 const CATEGORIES = [
@@ -380,17 +372,15 @@ function todayStr(){ return fmtDate(new Date()); }
 function catById(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[0]; }
 function niceDate(d){ return `${DAY_LABELS[(d.getDay()+6)%7]} ${d.getDate()} ${MONTH_LABELS[d.getMonth()]}`; }
 
-// ---------- bootstrap: firebase config check ----------
-if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+// ---------- bootstrap: supabase config check ----------
+if (supabaseConfig.url === "YOUR_SUPABASE_URL") {
   document.getElementById('setupNotice').classList.add('show');
 } else {
   startApp();
 }
 
 function startApp(){
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+  const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey);
 
   const state = {
     pin: localStorage.getItem('aube_temps_pin') || null,
@@ -427,49 +417,67 @@ function startApp(){
   }
 
   function boot(){
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        state.uid = user.uid;
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        state.uid = session.user.id;
         appEl.classList.add('show');
         subscribeData();
       }
     });
-    signInAnonymously(auth).catch(err => {
-      alert("Erreur de connexion Firebase : " + err.message);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) return;
+      supabase.auth.signInAnonymously().catch(err => {
+        alert("Erreur de connexion Supabase : " + err.message);
+      });
     });
   }
 
-  function blocksCol(){ return collection(db, 'spaces', state.pin, 'blocks'); }
-  function goalsDoc(){ return doc(db, 'spaces', state.pin, 'meta', 'goals'); }
+  function mapBlock(r){
+    return { id: r.id, title: r.title, category: r.category, date: r.date, time: r.time,
+      duration: r.duration, done: r.done, confirmed: r.confirmed, createdAt: new Date(r.created_at).getTime() };
+  }
+
+  async function fetchBlocks(){
+    const { data, error } = await supabase.from('blocks').select('*').eq('space_id', state.pin);
+    if (error) { console.error(error); return; }
+    state.blocks = data.map(mapBlock);
+    renderAll();
+  }
+  async function fetchGoals(){
+    const { data, error } = await supabase.from('goals').select('*').eq('space_id', state.pin).maybeSingle();
+    if (error) { console.error(error); return; }
+    state.goals = data ? { ...DEFAULT_GOALS, ...data } : { ...DEFAULT_GOALS };
+    renderAll();
+  }
 
   function subscribeData(){
-    onSnapshot(blocksCol(), snap => {
-      state.blocks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderAll();
-    });
-    onSnapshot(goalsDoc(), snap => {
-      state.goals = snap.exists() ? { ...DEFAULT_GOALS, ...snap.data() } : { ...DEFAULT_GOALS };
-      renderAll();
-    });
+    fetchBlocks();
+    fetchGoals();
+    supabase.channel('blocks-' + state.pin)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'blocks', filter: 'space_id=eq.' + state.pin }, fetchBlocks)
+      .subscribe();
+    supabase.channel('goals-' + state.pin)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: 'space_id=eq.' + state.pin }, fetchGoals)
+      .subscribe();
   }
 
   // ---------- CRUD ----------
   async function saveBlock(data){
     if (state.editingId) {
-      await updateDoc(doc(blocksCol(), state.editingId), data);
+      await supabase.from('blocks').update(data).eq('id', state.editingId);
     } else {
-      await addDoc(blocksCol(), { ...data, done: false, confirmed: false, createdAt: Date.now() });
+      await supabase.from('blocks').insert({ ...data, space_id: state.pin, done: false, confirmed: false });
     }
+    fetchBlocks();
   }
-  async function toggleDone(id, done){ await updateDoc(doc(blocksCol(), id), { done }); }
-  async function moveToToday(id){ await updateDoc(doc(blocksCol(), id), { date: todayStr(), confirmed: false }); }
-  async function removeBlock(id){ await deleteDoc(doc(blocksCol(), id)); }
+  async function toggleDone(id, done){ await supabase.from('blocks').update({ done }).eq('id', id); fetchBlocks(); }
+  async function moveToToday(id){ await supabase.from('blocks').update({ date: todayStr(), confirmed: false }).eq('id', id); fetchBlocks(); }
+  async function removeBlock(id){ await supabase.from('blocks').delete().eq('id', id); fetchBlocks(); }
   async function confirmDay(dateStr){
-    const batch = writeBatch(db);
-    state.blocks.filter(b => b.date === dateStr).forEach(b => batch.update(doc(blocksCol(), b.id), { confirmed: true }));
-    await batch.commit();
+    await supabase.from('blocks').update({ confirmed: true }).eq('space_id', state.pin).eq('date', dateStr);
+    fetchBlocks();
   }
-  async function saveGoals(goals){ await setDoc(goalsDoc(), goals); }
+  async function saveGoals(goals){ await supabase.from('goals').upsert({ space_id: state.pin, ...goals }); fetchGoals(); }
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab').forEach(btn => {
